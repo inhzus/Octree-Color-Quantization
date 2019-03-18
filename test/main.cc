@@ -1,9 +1,12 @@
 //
 // Copyright [2019] <Zhi Sun>
 //
-#include "bmp-handler-test.h"
+#include "BmpImageTest.h"
+#include "OctTreeTest.h"
 #include <cstdio>
+
 int main() {
-  (new BmpHandlerTest)->run();
+  (new BmpImageTest)->run();
+  (new OctTreeTest)->run();
   return 0;
 }

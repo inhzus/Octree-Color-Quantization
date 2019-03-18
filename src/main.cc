@@ -2,7 +2,7 @@
 // Copyright [2019] <inhzus>
 //
 
-#include "bmp-handler.h"
+#include "BmpImage.h"
 #include <cstdio>
 
 int main() {
