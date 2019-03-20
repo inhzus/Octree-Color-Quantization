@@ -34,9 +34,9 @@ BmpInfoHeader::BmpInfoHeader(uint32_t width, uint32_t height) {
   biWidth = width;
   biHeight = height;
   biPlanes = 1;
-  biBitCount = 0;
+  biBitCount = 8;
   biCompression = 0;
-  biSizeImage = (getPaddingBytesPerRow(width) + width) * height;
+  biSizeImage = (getPaddingBytesPerRow(width * BITS_PER_CHANNEL) + width) * height;
   biXPixelsPerMeter = biYPixelsPerMeter = biClrUsed = biClrImportant = 0;
 }
 
@@ -45,6 +45,16 @@ Pixel::Pixel(const OctNode *node) {
   green = node->green;
   red = node->red;
   alpha = 0;
+}
+Pixel::Pixel(uint8_t blue, uint8_t green, uint8_t red, uint8_t alpha)
+    : blue(blue), green(green), red(red), alpha(alpha) {}
+
+Pixel &Pixel::operator+=(const WidePixel &pixel) {
+  blue += pixel.blue;
+  green += pixel.green;
+  red += pixel.red;
+  alpha += alpha;
+  return *this;
 }
 
 BmpImage::BmpImage(string filename) {
@@ -59,7 +69,7 @@ std::istream &operator>>(std::istream &in, BmpImage &image) {
   const BmpFileHeader &fileHeader = image.fileHeader;
   const BmpInfoHeader &infoHeader = image.infoHeader;
 
-  if (infoHeader.biBitCount == RGB_CHANNELS * BITS_PER_CHANNEL) {
+  if (infoHeader.biBitCount == RGB_CHANNELS * 8) {
     image.bitmap = vector<vector<Pixel>>(infoHeader.biHeight, vector<Pixel>(infoHeader.biWidth, Pixel()));
     in.seekg(fileHeader.bfOffBits, std::ios::beg);
     const uint32_t paddingBytesPerRow = getPaddingBytesPerRow(
@@ -75,10 +85,9 @@ std::istream &operator>>(std::istream &in, BmpImage &image) {
   return in;
 }
 std::ostream &operator<<(std::ostream &out, BmpImage &image) {
-  out.write((char *) &image.fileHeader, sizeof(BmpFileHeader));
-  out.write((char *) &image.infoHeader, sizeof(BmpInfoHeader));
-  out.flush();
   if (image.palette.empty()) {
+    out.write((char *) &image.fileHeader, sizeof(BmpFileHeader));
+    out.write((char *) &image.infoHeader, sizeof(BmpInfoHeader));
     const uint32_t
         paddingBytesPerRow = getPaddingBytesPerRow(
         image.infoHeader.biWidth * RGB_CHANNELS * BITS_PER_CHANNEL);
@@ -92,8 +101,19 @@ std::ostream &operator<<(std::ostream &out, BmpImage &image) {
       }
     }
   } else {
-    out.write((char *) &image.palette, sizeof(Pixel) * image.palette.size());
-    out.write((char *) &image.storage, sizeof(uint8_t) * image.storage.size());
+    const uint32_t paddingBytesPerRow =
+        getPaddingBytesPerRow(image.infoHeader.biWidth * BITS_PER_CHANNEL);
+
+    auto *fileHeader = (new BmpFileHeader(
+        (image.infoHeader.biWidth + paddingBytesPerRow) * image.infoHeader.biHeight
+            + sizeof(BmpFileHeader)
+            + sizeof(BmpInfoHeader) + sizeof(Pixel) * image.palette.size()));
+    out.write((char *) fileHeader, sizeof(BmpFileHeader));
+    auto *infoHeader = (new BmpInfoHeader(
+        image.infoHeader.biWidth, image.infoHeader.biHeight));
+    out.write((char *) infoHeader, sizeof(BmpInfoHeader));
+    out.write((char *) &image.palette[0], sizeof(Pixel) * image.palette.size());
+    out.write((char *) &image.storage[0], sizeof(uint8_t) * image.storage.size());
   }
   return out;
 }
@@ -106,20 +126,45 @@ void BmpImage::setPalette(const OctTree &tree) {
   const auto &nodeList = tree.getHeap();
   OctNode *root = tree.getRoot();
 
-  palette.reserve(nodeList.size());
+  palette.reserve(PALETTE_SPACE);
   for (int i = 0; i < nodeList.size(); i++) {
-    palette[i] = nodeList[i];
+    palette.emplace_back(nodeList[i]);
 //    map[nodeList[i]] = i;
     nodeList[i]->ptr = i;
   }
+  palette.resize(PALETTE_SPACE, Pixel());
 
-  storage.reserve(nodeList.size());
+  const uint32_t paddingBytesPerRow =
+      getPaddingBytesPerRow(infoHeader.biWidth * BITS_PER_CHANNEL);
+  storage.reserve(
+      (paddingBytesPerRow + infoHeader.biWidth) *
+          infoHeader.biHeight * BITS_PER_CHANNEL);
   for (int i = infoHeader.biHeight - 1; i >= 0; i--) {
     for (int j = 0; j < infoHeader.biWidth; j++) {
       Pixel pixel = bitmap[i][j];
       OctNode *altNode = getClosestColor(root, pixel.blue, pixel.green, pixel.red);
       storage.push_back((uint8_t) altNode->ptr);
-//      storage.push_back(tmp);
+#ifdef DITHER
+      WidePixel error = WidePixel(altNode) - pixel;
+      if (error.green > 50) {
+        std::cout << error << std::endl;
+      }
+      if (j + 1 < infoHeader.biWidth) {
+        bitmap[i][j + 1] += error * 7 / 16;
+      }
+      if (j - 1 >= 0 && i + 1 < infoHeader.biHeight) {
+        bitmap[i + 1][j - 1] += error * 3 / 16;
+      }
+      if (i + 1 < infoHeader.biHeight) {
+        bitmap[i + 1][j] += error * 5 / 16;
+      }
+      if (i + 1 < infoHeader.biHeight && j + 1 < infoHeader.biWidth) {
+        bitmap[i + 1][j + 1] += error / 16;
+      }
+#endif
+    }
+    for (int k = 0; k < paddingBytesPerRow; k++) {
+      storage.push_back(uint8_t());
     }
   }
 }
