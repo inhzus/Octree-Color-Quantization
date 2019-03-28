@@ -55,6 +55,7 @@ class BmpImage {
   friend std::ostream &operator<<(std::ostream &out, BmpImage &image);
 };
 
+/*
 namespace std {
 template<>
 struct hash<OctNode *> {
@@ -71,5 +72,6 @@ struct equal_to<OctNode *> {
   }
 };
 }
+*/
 
 #endif //OCTQUANT_BMP_HANDLER_H

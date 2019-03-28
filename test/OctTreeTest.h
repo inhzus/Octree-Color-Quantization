@@ -35,7 +35,7 @@ class OctTreeTest {
     image.setPalette(tree);
   }
   void convert() {
-    BmpImage image("asset/image/arch.bmp");
+    BmpImage image("asset/image/mount.bmp");
 //    BmpImage image("test/out.bmp");
     OctTree tree(256);
     tree.insertBitmap(image.getBitmap());

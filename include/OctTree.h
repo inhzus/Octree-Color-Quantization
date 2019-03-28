@@ -21,7 +21,7 @@ const unsigned ROW_ALIGNMENT = 4;
 const int OCT_NUM = 8;
 const int PALETTE_SPACE = 256;
 
-#define DITHER
+//#define DITHER
 #define CLUSTER
 
 struct OctNode;
@@ -58,30 +58,8 @@ struct OctNode {
   OctNode();
   OctNode(uint8_t idx, int depth, uint8_t blue, uint8_t green, uint8_t red, OctNode *parent);
   friend std::ostream &operator<<(std::ostream &os, const OctNode &node);
-  inline bool isLeaf() const {
-#ifdef CLUSTER
-    bool ret = true;
-    for (auto child : children) {
-      if (child != nullptr) {
-        ret = false;
-      }
-    }
-    return ret;
-#else
-    return cnt == mix;
-#endif
-  }
-  inline int removeChildren() {
-    int ret = 0;
-    for (auto & child : children) {
-      if (child != nullptr) {
-        ret++;
-        child = nullptr;
-      }
-    }
-    mix = cnt;
-    return ret;
-  }
+  inline bool isLeaf() const;
+  inline int removeChildren();
 };
 
 class OctTree {

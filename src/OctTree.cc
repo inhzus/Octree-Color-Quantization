@@ -54,7 +54,10 @@ void OctTree::generatePalette() {
   auto leavesNum = getLeaves(root).size();
   for (int i = OCT_NUM - 2; i >= 0; i--) {
     vector<OctNode *> &line = nodes[i];
-    std::sort(line.begin(), line.end());
+    std::sort(line.begin(), line.end(),
+              [](const OctNode *lon, const OctNode *ron) {
+                return comparator(ron, lon);
+              });
     int k;
     for (k = 0; k < line.size(); k++) {
       leavesNum -= (line[k]->removeChildren() - 1);
@@ -96,11 +99,7 @@ bool OctTree::comparator(const OctNode *lon, const OctNode *ron) {
 
 inline uint8_t OctTree::shrinkColor(uint8_t color, int remain) {
 //  return (color >> (OCT_NUM - remain - 1));
-#ifdef CLUSTER
   return color & (uint8_t) (UCHAR_MAX << (OCT_NUM - remain - 1));
-#else
-  return color & (uint8_t) (UCHAR_MAX << (OCT_NUM - remain - 1));
-#endif
 }
 
 void OctTree::mixColor(OctNode *parent, OctNode *child) {
@@ -146,7 +145,6 @@ vector<OctNode *> OctTree::getLeaves(OctNode *node) {
   for (auto ptr : node->children) {
     if (ptr != nullptr) {
       if (ptr->isLeaf()) {
-//        std::cout << *ptr << std::endl;
         ret.push_back(ptr);
       } else {
         vector<OctNode *> t = getLeaves(ptr);
@@ -172,9 +170,41 @@ OctNode::OctNode() : parent(nullptr) {
   }
 }
 std::ostream &operator<<(std::ostream &os, const OctNode &node) {
-  os << "blue: " << (uint32_t)node.blue << " green: " << (uint32_t)node.green << " red: " << (uint32_t)node.red << " cnt: " << node.cnt << " depth: "
+  os << "blue: " << (uint32_t) node.blue << " green: " << (uint32_t) node.green << " red: " << (uint32_t) node.red
+     << " cnt: " << node.cnt << " depth: "
      << node.depth;
   return os;
+}
+bool OctNode::isLeaf() const {
+#ifdef CLUSTER
+  bool ret = true;
+  for (auto child : children) {
+    if (child != nullptr) {
+      ret = false;
+    }
+  }
+  return ret;
+#else
+  return cnt == mix;
+#endif
+}
+int OctNode::removeChildren() {
+  int ret = 0;
+  uint64_t _blue = 0, _green = 0, _red = 0;
+  for (auto &child : children) {
+    if (child != nullptr) {
+      ret++;
+      _blue += child->blue * child->cnt;
+      _green += child->green * child->cnt;
+      _red += child->red * child->cnt;
+      child = nullptr;
+    }
+  }
+  blue = (uint8_t) (_blue / cnt);
+  green = (uint8_t) (_green / cnt);
+  red = (uint8_t) (_red / cnt);
+  mix = cnt;
+  return ret;
 }
 WidePixel::WidePixel(int32_t blue, int32_t green, int32_t red, int32_t alpha)
     : blue(blue), green(green), red(red), alpha(alpha) {}

@@ -146,9 +146,6 @@ void BmpImage::setPalette(const OctTree &tree) {
       storage.push_back((uint8_t) altNode->ptr);
 #ifdef DITHER
       WidePixel error = WidePixel(altNode) - pixel;
-      if (error.green > 50) {
-        std::cout << error << std::endl;
-      }
       if (j + 1 < infoHeader.biWidth) {
         bitmap[i][j + 1] += error * 7 / 16;
       }
